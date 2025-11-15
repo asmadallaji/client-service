@@ -1,57 +1,198 @@
 package tn.pi.clientservice.service;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import tn.pi.clientservice.dto.ClientDTO;
 import tn.pi.clientservice.entities.Client;
+import tn.pi.clientservice.enums.UserRole;
+import tn.pi.clientservice.enums.UserStatus;
+import tn.pi.clientservice.exception.ResourceAlreadyExistsException;
+import tn.pi.clientservice.exception.ResourceNotFoundException;
 import tn.pi.clientservice.mapper.ClientDTOMapper;
 import tn.pi.clientservice.repository.ClientRepository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
 public class ClientService {
-    private final ClientDTOMapper clientDTOMapper;
-    private final ClientRepository clientRepository;
+    @Autowired
+    private ClientRepository clientRepository;
 
-    public ClientService(ClientDTOMapper clientDTOMapper, ClientRepository clientRepository) {
-        this.clientDTOMapper = clientDTOMapper;
-        this.clientRepository = clientRepository;
-    }
-    public void create(Client client){
-        Client clientDansLaBDD = this.clientRepository.findByEmail(client.getEmail());
-        if(clientDansLaBDD == null) {
-            this.clientRepository.save(client);
+    @Autowired
+    private ClientDTOMapper clientDTOMapper;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    /**
+     * Register a new client
+     */
+    public ClientDTO registerClient(ClientDTO clientDTO) {
+        // Validate email uniqueness
+        if (clientRepository.existsByEmail(clientDTO.getEmail())) {
+            throw new ResourceAlreadyExistsException("Email already exists: " + clientDTO.getEmail());
         }
-    }
-    public Stream<ClientDTO> findAll() {
-        return this.clientRepository.findAll()
-                .stream().map(clientDTOMapper);
-    }
-    public Client lireOuCreer(Client clientAcreer){
-        Client clientDansLaBDD = this.clientRepository.findByEmail(clientAcreer.getEmail());
-        if(clientDansLaBDD == null) {
-            clientDansLaBDD = this.clientRepository.save(clientAcreer);
+
+        // Validate username uniqueness
+        if (clientRepository.existsByUsername(clientDTO.getUsername())) {
+            throw new ResourceAlreadyExistsException("Username already exists: " + clientDTO.getUsername());
         }
-        return clientDansLaBDD;
-    }
-    public void update(int id, Client client) {
-        Client clientDansLaBDD = this.getClient(id);
-        if(clientDansLaBDD.getId() == client.getId()) {
-            clientDansLaBDD.setEmail(client.getEmail());
-            clientDansLaBDD.setTelephone(client.getTelephone());
-            this.clientRepository.save(clientDansLaBDD);
+
+        // Create new client entity
+        Client client = new Client();
+        client.setFirstName(clientDTO.getFirstName().trim());
+        client.setLastName(clientDTO.getLastName().trim());
+        client.setEmail(clientDTO.getEmail().trim().toLowerCase());
+        client.setPhone(clientDTO.getPhone() != null ? clientDTO.getPhone().trim() : null);
+        client.setUsername(clientDTO.getUsername().trim());
+        client.setAddress(clientDTO.getAddress() != null ? clientDTO.getAddress().trim() : null);
+
+        // Hash password using BCrypt
+        client.setPassword(passwordEncoder.encode(clientDTO.getPassword()));
+
+        // Set default role if not provided
+        if (clientDTO.getRole() != null) {
+            client.setRole(clientDTO.getRole());
+        } else {
+            client.setRole(UserRole.CLIENT);
         }
+
+        // Set default status to ACTIVE
+        client.setStatus(UserStatus.ACTIVE);
+
+        // Save client to database
+        Client savedClient = clientRepository.save(client);
+
+        return clientDTOMapper.mapToDTO(savedClient);
     }
-    public Client getClient(int id) {
-        Optional<Client> optionalClient = this.clientRepository.findById(id);
-        return optionalClient.orElseThrow(
-                () -> new EntityNotFoundException("Aucun client n'existe avec cet id")
-        );
+
+    /**
+     * Get client by ID
+     */
+    public ClientDTO getClientById(Long id) {
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+        return clientDTOMapper.mapToDTO(client);
     }
-    public void delete(int id) {
-        Client clientDansLaBDD = this.getClient(id); // vérifie que le client existe
-        this.clientRepository.delete(clientDansLaBDD);
+
+    /**
+     * Get client by email
+     */
+    public ClientDTO getClientByEmail(String email) {
+        Client client = clientRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with email: " + email));
+        return clientDTOMapper.mapToDTO(client);
+    }
+
+    /**
+     * Get client by username
+     */
+    public ClientDTO getClientByUsername(String username) {
+        Client client = clientRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with username: " + username));
+        return clientDTOMapper.mapToDTO(client);
+    }
+
+    /**
+     * Get all clients
+     */
+    public List<ClientDTO> getAllClients() {
+        return clientRepository.findAll()
+                .stream()
+                .map(clientDTOMapper::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Update client
+     */
+    public ClientDTO updateClient(Long id, ClientDTO clientDTO) {
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+
+        // Check if email is being changed and if new email already exists
+        if (clientDTO.getEmail() != null && !clientDTO.getEmail().equals(client.getEmail())) {
+            if (clientRepository.existsByEmail(clientDTO.getEmail())) {
+                throw new ResourceAlreadyExistsException("Email already exists: " + clientDTO.getEmail());
+            }
+        }
+
+        // Check if username is being changed and if new username already exists
+        if (clientDTO.getUsername() != null && !clientDTO.getUsername().equals(client.getUsername())) {
+            if (clientRepository.existsByUsername(clientDTO.getUsername())) {
+                throw new ResourceAlreadyExistsException("Username already exists: " + clientDTO.getUsername());
+            }
+        }
+
+        // Update client from DTO
+        clientDTOMapper.updateClientFromDTO(clientDTO, client);
+
+        Client updatedClient = clientRepository.save(client);
+        return clientDTOMapper.mapToDTO(updatedClient);
+    }
+
+    /**
+     * Delete client
+     */
+    public void deleteClient(Long id) {
+        if (!clientRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Client not found with id: " + id);
+        }
+        clientRepository.deleteById(id);
+    }
+
+    /**
+     * Change password
+     */
+    public void changePassword(Long id, String oldPassword, String newPassword) {
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+
+        if (!passwordEncoder.matches(oldPassword, client.getPassword())) {
+            throw new IllegalArgumentException("Old password is incorrect");
+        }
+
+        client.setPassword(passwordEncoder.encode(newPassword));
+        clientRepository.save(client);
+    }
+
+    /**
+     * Get all clients by role
+     */
+    public List<ClientDTO> getClientsByRole(UserRole role) {
+        return clientRepository.findByRole(role.name())
+                .stream()
+                .map(clientDTOMapper::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get all clients by status
+     */
+    public List<ClientDTO> getClientsByStatus(UserStatus status) {
+        return clientRepository.findByStatus(status.name())
+                .stream()
+                .map(clientDTOMapper::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Check if email exists
+     */
+    public boolean emailExists(String email) {
+        return clientRepository.existsByEmail(email);
+    }
+
+    /**
+     * Check if username exists
+     */
+    public boolean usernameExists(String username) {
+        return clientRepository.existsByUsername(username);
     }
 }
