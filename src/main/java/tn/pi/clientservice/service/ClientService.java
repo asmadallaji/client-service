@@ -75,7 +75,7 @@ public class ClientService {
     /**
      * Get client by ID
      */
-    public ClientDTO getClientById(Long id) {
+    public ClientDTO getClientById(Integer id) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
         return clientDTOMapper.mapToDTO(client);
@@ -112,7 +112,7 @@ public class ClientService {
     /**
      * Update client
      */
-    public ClientDTO updateClient(Long id, ClientDTO clientDTO) {
+    public ClientDTO updateClient(Integer id, ClientDTO clientDTO) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
 
@@ -140,7 +140,7 @@ public class ClientService {
     /**
      * Delete client
      */
-    public void deleteClient(Long id) {
+    public void deleteClient(Integer id) {
         if (!clientRepository.existsById(id)) {
             throw new ResourceNotFoundException("Client not found with id: " + id);
         }
@@ -150,7 +150,7 @@ public class ClientService {
     /**
      * Change password
      */
-    public void changePassword(Long id, String oldPassword, String newPassword) {
+    public void changePassword(Integer id, String oldPassword, String newPassword) {
         Client client = clientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
 

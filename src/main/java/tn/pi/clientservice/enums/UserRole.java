@@ -13,7 +13,4 @@ public enum UserRole {
     public String getDisplayName() {
         return displayName;
     }
-
-    public static class UserRole {
-    }
 }

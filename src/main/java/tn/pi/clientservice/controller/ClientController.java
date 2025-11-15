@@ -87,7 +87,7 @@ public class ClientController {
      * GET /{id} - Get client by ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getClientById(@PathVariable Long id) {
+    public ResponseEntity<?> getClientById(@PathVariable Integer id) {
         try {
             ClientDTO client = clientService.getClientById(id);
             return ResponseEntity.ok(client);
@@ -151,7 +151,7 @@ public class ClientController {
      * PUT /{id} - Update client
      */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateClient(@PathVariable Long id, @Valid @RequestBody ClientDTO clientDTO) {
+    public ResponseEntity<?> updateClient(@PathVariable Integer id, @Valid @RequestBody ClientDTO clientDTO) {
         try {
             ClientDTO updatedClient = clientService.updateClient(id, clientDTO);
             return ResponseEntity.ok(updatedClient);
@@ -167,7 +167,7 @@ public class ClientController {
      * DELETE /{id} - Delete client
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteClient(@PathVariable Long id) {
+    public ResponseEntity<?> deleteClient(@PathVariable Integer id) {
         try {
             clientService.deleteClient(id);
             Map<String, Object> response = new HashMap<>();
@@ -219,7 +219,7 @@ public class ClientController {
      */
     @PostMapping("/change-password/{id}")
     public ResponseEntity<?> changePassword(
-            @PathVariable Long id,
+            @PathVariable Integer id,
             @RequestBody Map<String, String> passwordRequest) {
         try {
             String oldPassword = passwordRequest.get("oldPassword");
